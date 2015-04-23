@@ -1,0 +1,104 @@
+#!/bin/sh
+#
+# Git hook: post-receive
+# This file is executed once every push.
+#
+# This hook script is for nginx's sites-available.
+#
+# Installation:
+# 1. You need to install this into a git work tree in a remote server
+#    where your local pushes to.
+#
+# About this script:
+# 1. When you push commits from your local to the remote git repository,
+#    this checkouts changes into the git repository with force.
+# 2. Then, this parse and examines commits message patterns and execute
+#    them.
+#
+# If your commit message contains any or all of the following, it will:
+# 1. enable <space> <.conf file> - It will enable the new nginx configuration
+#    file. E.g. "enable timothyae.com.conf"
+# 2. disable <space> <.conf file> - It will disable the new nginx configuration
+#    file. E.g. "disable disable timothyae.com.conf"
+# 3. restart or reload - Nginx will reload.
+# 4. stop - Nginx will stop.
+# 5. start - Nginx will start.
+#
+# Note that in a commit message, you can have, any or some or all of 1, 2, 3, 4,
+# and 5 above, are allowed. E.g. a commit message:
+# "stop enable timothyae.com.conf disable another-domain.com.conf start restart"
+# means:
+# 1. It will enable timothyae.com.conf
+# 2. It will disable another-domain.com.conf
+# 3. It will restart nginx
+# 4. It will stop nginx
+# 5. It will start nginx
+# ^ In that order
+#
+
+# Vars
+nginx="/etc/nginx"
+work_tree="$nginx/sites-available"
+work_tree_enabled="$nginx/sites-enabled"
+git_dir="$work_tree/.git"
+
+echo ""
+echo "Execute: git checkout -f"
+sudo git --work-tree=$work_tree --git-dir=$git_dir checkout -f
+echo "Done."
+
+echo ""
+echo "Checking commit msg instruction..."
+echo ""
+
+msg=$(git --git-dir=$git_dir log -1 HEAD --pretty=format:%s)
+
+# Enable Host
+if echo $msg | grep -q -w "enable"; then
+    echo "Enabling host..."
+    host=$(echo $msg | awk -F 'enable ' '{print $2}' | awk '{print $1}')
+    echo "Enabling host: $host"
+    if [ -f $work_tree/$host ]; then
+        sudo ln -s $work_tree/$host $work_tree_enabled/$host
+        echo "Host $host has been enabled."
+    else 
+        echo "ERROR: Host conf not found!"
+        exit
+    fi
+    echo ""
+fi
+
+# Disable Host
+if echo $msg | grep -q -w "disable"; then
+    echo "Disabling host..."
+    host=$(echo $msg | awk -F 'disable ' '{print $2}' | awk '{print $1}')
+    echo "Disabling host: $host"
+    if [ -f $work_tree_enabled/$host ]; then
+        sudo rm $work_tree_enabled/$host
+        echo "Host $host has been disabled."
+    else
+        echo "ERROR: Host conf not enabled in the first place."
+        exit
+    fi
+    echo ""
+fi
+
+# Reload, restart
+if echo $msg | grep -q -w "reload\|restart"; then
+    sudo service nginx reload
+    echo ""
+fi
+
+# Stop
+if echo $msg | grep -q -w "stop"; then
+    sudo service nginx stop
+    echo "Nginx: stop"
+    echo ""
+fi
+
+# Start
+if echo $msg | grep -q -w "start"; then
+    sudo service nginx start
+    echo "Nginx: start"
+    echo ""
+fi
