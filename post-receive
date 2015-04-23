@@ -1,5 +1,8 @@
 #!/bin/sh
 #
+# Author: Timothy Escopete
+# Website: www.timothyae.com
+#
 # Git hook: post-receive
 # This file is executed once every push.
 #
