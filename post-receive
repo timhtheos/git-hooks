@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Author: Timothy Escopete
+# Website: www.timothyae.com
+#
+# Git hook: post-receive
+# This file is executed once every push.
+#
+
+# Get paths
+cd ..
+path=$(pwd)
+
+echo ""
+echo "Execute: git checkout -f"
+git --work-tree=$path --git-dir=$path/.git checkout -f
+echo "Done."
+
+echo ""
+echo "Checking commit msg instruction..."
+echo ""
+
+msg=$(git --git-dir=$path/.git log -1 HEAD --pretty=format:%s)
+
+# Run build
+if echo $msg | grep -q -w "build"; then
+  echo "Build..."
+  build=$(echo $msg | awk -F 'build' '{print $2}' | awk '{print $1}')
+  echo "Build method: $build"
+  build=$(echo $build | awk '{print toupper($0)}')
+  echo "Build method: $build"
+  cd $path/www
+  bash $path/bin/build.sh $build
+  echo ""
+fi
+
+# Push commits to bitbucket
+echo "Creating backup..."
+git --work-tree=$path --git-dir=$path/.git push origin master -f
+echo ""
